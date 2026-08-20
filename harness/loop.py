@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from harness.adapter import AdapterConfig, AnthropicAdapter, ModelResponse
 from harness.events import (
+    AgentFailed,
     AgentFinished,
+    AgentStarted,
     EventBus,
+    ModelCalled,
+    ModelResponded,
     ToolCalled,
     ToolResulted,
     TurnEnded,
@@ -31,7 +36,7 @@ class LoopConfig:
 class AgentResult:
     final_text: str
     total_turns: int
-    stop_reason: str        
+    stop_reason: str
     total_input_tokens: int
     total_output_tokens: int
 
@@ -53,67 +58,99 @@ class AgentLoop:
         self._adapter = AnthropicAdapter(self.config.adapter)
 
     async def run(self, task: str) -> AgentResult:
+        await self.bus.emit(AgentStarted(task=task))
+
         messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
         tools = self.registry.schemas()
+        model = self.config.adapter.model
 
         total_input = 0
         total_output = 0
         final_text = ""
         stop_reason = "max_turns"
+        turn = 0
 
-        for turn in range(1, self.config.max_turns + 1):
-            await self.bus.emit(TurnStarted(turn=turn))
+        try:
+            for turn in range(1, self.config.max_turns + 1):
+                await self.bus.emit(TurnStarted(turn=turn))
 
-            response: ModelResponse = await self._adapter.complete(messages, tools)
-            total_input += response.input_tokens
-            total_output += response.output_tokens
+                await self.bus.emit(ModelCalled(
+                    turn=turn,
+                    model=model,
+                    message_count=len(messages),
+                    tool_count=len(tools),
+                ))
 
-            # Append assistant message
-            messages.append({"role": "assistant", "content": self._response_to_content(response)})
+                t0 = time.perf_counter()
+                response: ModelResponse = await self._adapter.complete(messages, tools)
+                latency = time.perf_counter() - t0
 
-            final_text = response.text
-            await self.bus.emit(TurnEnded(
-                turn=turn,
-                stop_reason=response.stop_reason,
-                text=final_text,
+                total_input += response.input_tokens
+                total_output += response.output_tokens
+
+                await self.bus.emit(ModelResponded(
+                    turn=turn,
+                    model=model,
+                    input_tokens=response.input_tokens,
+                    output_tokens=response.output_tokens,
+                    latency=latency,
+                    stop_reason=response.stop_reason,
+                ))
+
+                # Append assistant message
+                messages.append({"role": "assistant", "content": self._response_to_content(response)})
+
+                final_text = response.text()
+                await self.bus.emit(TurnEnded(
+                    turn=turn,
+                    stop_reason=response.stop_reason,
+                    text=final_text,
+                ))
+
+                if response.stop_reason != "tool_use" or not response.tool_uses():
+                    stop_reason = response.stop_reason
+                    break
+
+                # Dispatch all tool calls, collect results
+                tool_results: list[dict[str, Any]] = []
+                for tool_use in response.tool_uses():
+                    await self.bus.emit(ToolCalled(
+                        turn=turn,
+                        tool_use_id=tool_use.tool_use_id,
+                        name=tool_use.name,
+                        input=tool_use.input,
+                    ))
+
+                    result = await self.registry.call(
+                        name=tool_use.name,
+                        tool_use_id=tool_use.tool_use_id,
+                        input_dict=tool_use.input,
+                    )
+
+                    await self.bus.emit(ToolResulted(
+                        turn=turn,
+                        tool_use_id=tool_use.tool_use_id,
+                        name=tool_use.name,
+                        output=result.output,
+                        is_error=result.is_error,
+                    ))
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": result.tool_use_id,
+                        "content": result.output,
+                        **({"is_error": True} if result.is_error else {}),
+                    })
+
+                messages.append({"role": "user", "content": tool_results})
+
+        except Exception as exc:
+            await self.bus.emit(AgentFailed(
+                turn=turn or None,
+                error=str(exc),
+                error_type=type(exc).__name__,
             ))
-
-            if response.stop_reason != "tool_use" or not response.tool_uses:
-                stop_reason = response.stop_reason
-                break
-
-            # Dispatch all tool calls, collect results
-            tool_results: list[dict[str, Any]] = []
-            for tool_use in response.tool_uses:
-                await self.bus.emit(ToolCalled(
-                    turn=turn,
-                    tool_use_id=tool_use.tool_use_id,
-                    name=tool_use.name,
-                    input=tool_use.input,
-                ))
-
-                result = await self.registry.call(
-                    name=tool_use.name,
-                    tool_use_id=tool_use.tool_use_id,
-                    input_dict=tool_use.input,
-                )
-
-                await self.bus.emit(ToolResulted(
-                    turn=turn,
-                    tool_use_id=tool_use.tool_use_id,
-                    name=tool_use.name,
-                    output=result.output,
-                    is_error=result.is_error,
-                ))
-
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": result.tool_use_id,
-                    "content": result.output,
-                    **({"is_error": True} if result.is_error else {}),
-                })
-
-            messages.append({"role": "user", "content": tool_results})
+            raise
 
         await self.bus.emit(AgentFinished(
             total_turns=turn,

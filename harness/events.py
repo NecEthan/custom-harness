@@ -12,8 +12,34 @@ from typing import Any, Awaitable, Callable
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
+class AgentStarted:
+    task: str
+    timestamp: float = field(default_factory=time.time)
+
+
+@dataclass(frozen=True)
 class TurnStarted:
     turn: int
+    timestamp: float = field(default_factory=time.time)
+
+
+@dataclass(frozen=True)
+class ModelCalled:
+    turn: int
+    model: str
+    message_count: int
+    tool_count: int
+    timestamp: float = field(default_factory=time.time)
+
+
+@dataclass(frozen=True)
+class ModelResponded:
+    turn: int
+    model: str
+    input_tokens: int
+    output_tokens: int
+    latency: float  # seconds, measured around adapter.complete()
+    stop_reason: str
     timestamp: float = field(default_factory=time.time)
 
 
@@ -51,7 +77,26 @@ class AgentFinished:
     timestamp: float = field(default_factory=time.time)
 
 
-Event = TurnStarted | ToolCalled | ToolResulted | TurnEnded | AgentFinished
+@dataclass(frozen=True)
+class AgentFailed:
+    error: str
+    error_type: str
+    turn: int | None = None
+    timestamp: float = field(default_factory=time.time)
+
+
+Event = (
+    AgentStarted
+    | TurnStarted
+    | ModelCalled
+    | ModelResponded
+    | ToolCalled
+    | ToolResulted
+    | TurnEnded
+    | AgentFinished
+    | AgentFailed
+)
+
 
 # ---------------------------------------------------------------------------
 # Event bus
