@@ -59,6 +59,7 @@ class ToolResulted:
     name: str
     output: str
     is_error: bool
+    duration: float | None = None  # tool execution time in seconds
     timestamp: float = field(default_factory=time.time)
 
 
@@ -95,7 +96,7 @@ Event = (
     | TurnEnded
     | AgentFinished
     | AgentFailed
-)
+)  # discriminated union — all event types the bus can carry
 
 
 # ---------------------------------------------------------------------------

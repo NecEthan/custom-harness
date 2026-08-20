@@ -18,7 +18,7 @@ import anthropic
 
 @dataclass
 class AdapterConfig:
-    model: str = "claude-sonnet-4-6"
+    model: str = "claude-haiku-4-5-20251001"
     max_output_tokens: int = 8096
     system: str = "You are a helpful AI coding assistant."
     # api_key read from ANTHROPIC_API_KEY env var by default

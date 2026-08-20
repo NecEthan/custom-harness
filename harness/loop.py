@@ -121,11 +121,13 @@ class AgentLoop:
                         input=tool_use.input,
                     ))
 
+                    t_tool = time.perf_counter()
                     result = await self.registry.call(
                         name=tool_use.name,
                         tool_use_id=tool_use.tool_use_id,
                         input_dict=tool_use.input,
                     )
+                    tool_duration = time.perf_counter() - t_tool
 
                     await self.bus.emit(ToolResulted(
                         turn=turn,
@@ -133,6 +135,7 @@ class AgentLoop:
                         name=tool_use.name,
                         output=result.output,
                         is_error=result.is_error,
+                        duration=tool_duration,
                     ))
 
                     tool_results.append({
