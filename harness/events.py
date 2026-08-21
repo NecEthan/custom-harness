@@ -86,6 +86,15 @@ class AgentFailed:
     timestamp: float = field(default_factory=time.time)
 
 
+@dataclass(frozen=True)
+class ContextCondensed:
+    turn: int
+    messages_before: int      # message count before condensation
+    messages_after: int       # message count after
+    input_tokens_before: int  # token count that triggered condensation
+    timestamp: float = field(default_factory=time.time)
+
+
 Event = (
     AgentStarted
     | TurnStarted
@@ -96,6 +105,7 @@ Event = (
     | TurnEnded
     | AgentFinished
     | AgentFailed
+    | ContextCondensed
 )  # discriminated union — all event types the bus can carry
 
 

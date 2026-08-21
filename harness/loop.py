@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -11,6 +12,7 @@ from harness.events import (
     AgentFailed,
     AgentFinished,
     AgentStarted,
+    ContextCondensed,
     EventBus,
     ModelCalled,
     ModelResponded,
@@ -29,6 +31,7 @@ from harness.registry import ToolRegistry
 @dataclass
 class LoopConfig:
     max_turns: int = 20
+    context_threshold: float = 0.75  # fraction of context_limit that triggers summarization
     adapter: AdapterConfig = field(default_factory=AdapterConfig)
 
 
@@ -69,9 +72,25 @@ class AgentLoop:
         final_text = ""
         stop_reason = "max_turns"
         turn = 0
+        last_input_tokens = 0  # token count from the previous turn's request
 
         try:
             for turn in range(1, self.config.max_turns + 1):
+
+                # Condense context if the previous turn's token usage crossed the threshold
+                token_limit = self.config.adapter.context_limit * self.config.context_threshold
+                if last_input_tokens > token_limit:
+                    before = len(messages)
+                    summary_response, messages = await self._condense(messages)
+                    total_input += summary_response.input_tokens
+                    total_output += summary_response.output_tokens
+                    await self.bus.emit(ContextCondensed(
+                        turn=turn,
+                        messages_before=before,
+                        messages_after=len(messages),
+                        input_tokens_before=last_input_tokens,
+                    ))
+
                 await self.bus.emit(TurnStarted(turn=turn))
 
                 await self.bus.emit(ModelCalled(
@@ -85,6 +104,7 @@ class AgentLoop:
                 response: ModelResponse = await self._adapter.complete(messages, tools)
                 latency = time.perf_counter() - t0
 
+                last_input_tokens = response.input_tokens
                 total_input += response.input_tokens
                 total_output += response.output_tokens
 
@@ -167,6 +187,62 @@ class AgentLoop:
             total_input_tokens=total_input,
             total_output_tokens=total_output,
         )
+
+    async def _condense(
+        self, messages: list[dict[str, Any]]
+    ) -> tuple[ModelResponse, list[dict[str, Any]]]:
+        """Summarize conversation history and return a condensed messages list.
+
+        Keeps the original user task and the last 4 messages (2 turn pairs) verbatim.
+        Everything in between is replaced with a model-generated summary.
+        """
+        history_text = self._messages_to_text(messages)
+        summary_response = await self._adapter.complete(
+            messages=[{
+                "role": "user",
+                "content": (
+                    "Summarize the following agent conversation concisely. "
+                    "Preserve: the original task, key decisions, tool calls and their results, "
+                    "current progress, and any important state. Be specific about what was "
+                    "done and what still needs to be done.\n\n"
+                    + history_text
+                ),
+            }],
+            tools=None,
+        )
+        summary = summary_response.text()
+
+        # Keep original task + summary bridge + last 4 messages for immediate context
+        tail_start = max(1, len(messages) - 4)
+        condensed: list[dict[str, Any]] = [
+            messages[0],  # original user task — never drop
+            {"role": "assistant", "content": [{"type": "text", "text": f"[Summary of prior work: {summary}]"}]},
+            {"role": "user", "content": "Continue with the task based on the summary above."},
+            *messages[tail_start:],
+        ]
+        return summary_response, condensed
+
+    @staticmethod
+    def _messages_to_text(messages: list[dict[str, Any]]) -> str:
+        """Render messages list as plain text for the summarization prompt."""
+        parts = []
+        for msg in messages:
+            role = msg["role"].upper()
+            content = msg["content"]
+            if isinstance(content, str):
+                parts.append(f"{role}: {content}")
+            elif isinstance(content, list):
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    btype = block.get("type", "")
+                    if btype == "text":
+                        parts.append(f"{role}: {block['text']}")
+                    elif btype == "tool_use":
+                        parts.append(f"{role} [tool:{block['name']}]: {json.dumps(block.get('input', {}))}")
+                    elif btype == "tool_result":
+                        parts.append(f"{role} [result:{block.get('tool_use_id', '')}]: {block.get('content', '')}")
+        return "\n\n".join(parts)
 
     @staticmethod
     def _response_to_content(response: ModelResponse) -> list[dict[str, Any]]:
