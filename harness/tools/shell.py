@@ -51,14 +51,20 @@ def register_shell_tools(
             proc.kill()
             return f"(timeout after {timeout}s)"
 
-        out = stdout.decode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
-        err = stderr.decode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
+        raw_out = stdout.decode("utf-8", errors="replace")
+        raw_err = stderr.decode("utf-8", errors="replace")
+        out = raw_out[:MAX_OUTPUT_BYTES]
+        err = raw_err[:MAX_OUTPUT_BYTES]
 
         parts = []
         if out:
             parts.append(out)
+            if len(raw_out) > MAX_OUTPUT_BYTES:
+                parts.append(f"[stdout truncated at {MAX_OUTPUT_BYTES} bytes — {len(raw_out)} bytes total]")
         if err:
             parts.append(f"[stderr]\n{err}")
+            if len(raw_err) > MAX_OUTPUT_BYTES:
+                parts.append(f"[stderr truncated at {MAX_OUTPUT_BYTES} bytes — {len(raw_err)} bytes total]")
         parts.append(f"[exit {proc.returncode}]")
         return "\n".join(parts)
 

@@ -57,3 +57,21 @@ async def test_allowlist_permits_command():
     result = await r.call("run_shell", "s7", {"command": "echo ok"})
     assert not result.is_error
     assert "ok" in result.output
+
+
+async def test_stdout_truncation_marker(registry):
+    from harness.tools.shell import MAX_OUTPUT_BYTES
+    # Generate output larger than the cap
+    big = "x" * (MAX_OUTPUT_BYTES + 100)
+    result = await registry.call("run_shell", "s8", {
+        "command": f"python3 -c \"print('{big}')\""
+    })
+    assert not result.is_error
+    assert "truncated at" in result.output
+    assert "bytes total" in result.output
+
+
+async def test_stdout_within_limit_no_truncation_marker(registry):
+    result = await registry.call("run_shell", "s9", {"command": "echo short"})
+    assert not result.is_error
+    assert "truncated" not in result.output
