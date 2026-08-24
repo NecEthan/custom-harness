@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from harness.events import Event, EventBus
 from harness.loop import AgentLoop, LoopConfig
+from harness.permissions import PermissionMode
 from harness.registry import ToolRegistry
 from harness.serialization import event_to_dict
 from harness.tools.file import register_file_tools
@@ -68,13 +69,14 @@ class RunRequest(BaseModel):
     task: str
     max_turns: int = 20
     work_dir: str = "."
+    permission_mode: PermissionMode = PermissionMode.DEFAULT
 
 
 # ---------------------------------------------------------------------------
 # Background run executor
 # ---------------------------------------------------------------------------
 
-async def _execute_run(state: RunState, task: str, max_turns: int, work_dir: str) -> None:
+async def _execute_run(state: RunState, task: str, max_turns: int, work_dir: str, permission_mode: PermissionMode = PermissionMode.DEFAULT) -> None:
     """Run the agent and push every EventBus event to all connected SSE clients."""
 
     async def push(event: Event) -> None:
@@ -87,7 +89,7 @@ async def _execute_run(state: RunState, task: str, max_turns: int, work_dir: str
     bus.subscribe(push)
 
     root = Path(work_dir).resolve()
-    registry = ToolRegistry()
+    registry = ToolRegistry(mode=permission_mode)
     register_file_tools(registry, root=root)
     register_shell_tools(registry, timeout=30)
 
@@ -121,6 +123,7 @@ async def start_run(body: RunRequest, background_tasks: BackgroundTasks):
             body.task,
             body.max_turns,
             body.work_dir,
+            body.permission_mode,
         )
     return {"status": "started", "task": body.task}
 

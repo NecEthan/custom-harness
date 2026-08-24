@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
+
+from harness.permissions import PermissionMode, ToolPermission, is_allowed
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +29,7 @@ class ToolDefinition:
     description: str
     input_schema: dict[str, Any]
     fn: Callable[..., Awaitable[str]]
+    permission: ToolPermission = ToolPermission.READ  # minimum permission required to call this tool
 
     def to_api_schema(self) -> dict[str, Any]:
         return {
@@ -41,8 +44,9 @@ class ToolDefinition:
 # ---------------------------------------------------------------------------
 
 class ToolRegistry:
-    def __init__(self) -> None:
+    def __init__(self, mode: PermissionMode = PermissionMode.DEFAULT) -> None:
         self._tools: dict[str, ToolDefinition] = {}
+        self.mode = mode
 
     def register(self, definition: ToolDefinition) -> None:
         self._tools[definition.name] = definition
@@ -52,6 +56,7 @@ class ToolRegistry:
         name: str,
         description: str,
         input_schema: dict[str, Any],
+        permission: ToolPermission = ToolPermission.READ,
     ) -> Callable:
         """Decorator for registering a tool."""
         def decorator(fn: Callable[..., Awaitable[str]]) -> Callable:
@@ -60,12 +65,18 @@ class ToolRegistry:
                 description=description,
                 input_schema=input_schema,
                 fn=fn,
+                permission=permission,
             ))
             return fn
         return decorator
 
     def schemas(self) -> list[dict[str, Any]]:
-        return [t.to_api_schema() for t in self._tools.values()]
+        """Return API schemas for tools allowed in the current mode."""
+        return [
+            t.to_api_schema()
+            for t in self._tools.values()
+            if is_allowed(self.mode, t.permission)
+        ]
 
     async def call(self, name: str, tool_use_id: str, input_dict: dict[str, Any]) -> ToolResult:
         if name not in self._tools:
@@ -74,8 +85,18 @@ class ToolRegistry:
                 output=f"Unknown tool: {name}",
                 is_error=True,
             )
+        tool = self._tools[name]
+        if not is_allowed(self.mode, tool.permission):
+            return ToolResult(
+                tool_use_id=tool_use_id,
+                output=(
+                    f"PermissionError: '{name}' requires {tool.permission.value!r} permission "
+                    f"but current mode is {self.mode.value!r}"
+                ),
+                is_error=True,
+            )
         try:
-            output = await self._tools[name].fn(**input_dict)
+            output = await tool.fn(**input_dict)
             return ToolResult(tool_use_id=tool_use_id, output=output)
         except Exception as exc:
             return ToolResult(

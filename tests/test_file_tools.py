@@ -3,13 +3,14 @@
 import json
 
 import pytest
+from harness.permissions import PermissionMode
 from harness.registry import ToolRegistry
 from harness.tools.file import MAX_LINES, register_file_tools
 
 
 @pytest.fixture
 def registry(tmp_path):
-    r = ToolRegistry()
+    r = ToolRegistry(mode=PermissionMode.BYPASS)
     register_file_tools(r, root=tmp_path)
     return r, tmp_path
 

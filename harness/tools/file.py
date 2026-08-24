@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from harness.permissions import ToolPermission
 from harness.registry import ToolDefinition, ToolRegistry
 
 MAX_LINES = 200
@@ -112,6 +113,7 @@ def register_file_tools(registry: ToolRegistry, root: str | Path) -> None:
             "required": ["path"],
         },
         fn=read_file,
+        permission=ToolPermission.READ,
     ))
 
     registry.register(ToolDefinition(
@@ -126,6 +128,7 @@ def register_file_tools(registry: ToolRegistry, root: str | Path) -> None:
             "required": ["path", "content"],
         },
         fn=write_file,
+        permission=ToolPermission.EDIT,
     ))
 
     registry.register(ToolDefinition(
@@ -147,4 +150,5 @@ def register_file_tools(registry: ToolRegistry, root: str | Path) -> None:
             "required": [],
         },
         fn=list_directory,
+        permission=ToolPermission.READ,
     ))

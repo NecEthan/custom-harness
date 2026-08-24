@@ -1,13 +1,14 @@
 """Tests for shell tool."""
 
 import pytest
+from harness.permissions import PermissionMode
 from harness.registry import ToolRegistry
 from harness.tools.shell import register_shell_tools
 
 
 @pytest.fixture
 def registry():
-    r = ToolRegistry()
+    r = ToolRegistry(mode=PermissionMode.BYPASS)
     register_shell_tools(r, timeout=5)
     return r
 
@@ -30,7 +31,7 @@ async def test_stderr_captured(registry):
 
 
 async def test_timeout(registry):
-    r = ToolRegistry()
+    r = ToolRegistry(mode=PermissionMode.BYPASS)
     register_shell_tools(r, timeout=1)
     result = await r.call("run_shell", "s4", {"command": "sleep 10"})
     assert not result.is_error
@@ -44,7 +45,7 @@ async def test_empty_command(registry):
 
 
 async def test_allowlist_blocks_command():
-    r = ToolRegistry()
+    r = ToolRegistry(mode=PermissionMode.BYPASS)
     register_shell_tools(r, allowed_commands=["echo"])
     result = await r.call("run_shell", "s6", {"command": "ls ."})
     assert result.is_error
@@ -52,7 +53,7 @@ async def test_allowlist_blocks_command():
 
 
 async def test_allowlist_permits_command():
-    r = ToolRegistry()
+    r = ToolRegistry(mode=PermissionMode.BYPASS)
     register_shell_tools(r, allowed_commands=["echo"])
     result = await r.call("run_shell", "s7", {"command": "echo ok"})
     assert not result.is_error

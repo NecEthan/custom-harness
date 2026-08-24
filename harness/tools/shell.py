@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import shlex
 
+from harness.permissions import ToolPermission
 from harness.registry import ToolDefinition, ToolRegistry
 
 DEFAULT_TIMEOUT = 30  # seconds
@@ -85,4 +86,5 @@ def register_shell_tools(
             "required": ["command"],
         },
         fn=run_shell,
+        permission=ToolPermission.EXECUTE,
     ))
