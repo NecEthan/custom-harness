@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from harness.adapter import AdapterConfig, AnthropicAdapter, ModelResponse
+from harness.errors import FailureLayer, classify
 from harness.events import (
     AgentFailed,
     AgentFinished,
     AgentStarted,
     ContextCondensed,
+    ControlFlowAborted,
     EventBus,
     ModelCalled,
     ModelResponded,
+    RetryScheduled,
     ToolCalled,
     ToolResulted,
     TurnEnded,
@@ -31,7 +35,12 @@ from harness.registry import ToolRegistry
 @dataclass
 class LoopConfig:
     max_turns: int = 20
-    context_threshold: float = 0.75  # fraction of context_limit that triggers summarization
+    context_threshold: float = 0.75      # fraction of context_limit before proactive condensation
+    max_api_retries: int = 3             # max retries for transient API errors
+    retry_base_delay: float = 1.0        # seconds — first retry delay
+    retry_max_delay: float = 60.0        # seconds — cap on exponential backoff
+    retry_backoff: float = 2.0           # multiplier per retry
+    control_flow_repeat_limit: int = 3   # consecutive identical turn patterns → abort
     adapter: AdapterConfig = field(default_factory=AdapterConfig)
 
 
@@ -72,12 +81,13 @@ class AgentLoop:
         final_text = ""
         stop_reason = "max_turns"
         turn = 0
-        last_input_tokens = 0  # token count from the previous turn's request
+        last_input_tokens = 0          # token count from the previous turn's request
+        recent_turn_fingerprints: list[str] = []  # rolling window for control-flow detection
 
         try:
             for turn in range(1, self.config.max_turns + 1):
 
-                # Condense context if the previous turn's token usage crossed the threshold
+                # Proactive condensation: previous turn's token count crossed the threshold
                 token_limit = self.config.adapter.context_limit * self.config.context_threshold
                 if last_input_tokens > token_limit:
                     before = len(messages)
@@ -100,8 +110,9 @@ class AgentLoop:
                     tool_count=len(tools),
                 ))
 
+                # Call the model with retry/adjust logic
                 t0 = time.perf_counter()
-                response: ModelResponse = await self._adapter.complete(messages, tools)
+                response, messages = await self._complete_with_recovery(messages, tools, turn)
                 latency = time.perf_counter() - t0
 
                 last_input_tokens = response.input_tokens
@@ -129,6 +140,27 @@ class AgentLoop:
 
                 if response.stop_reason != "tool_use" or not response.tool_uses():
                     stop_reason = response.stop_reason
+                    break
+
+                # Control-flow detection: fingerprint this turn's tool calls
+                turn_fp = "|".join(sorted(
+                    f"{tu.name}:{json.dumps(tu.input, sort_keys=True)}"
+                    for tu in response.tool_uses()
+                ))
+                recent_turn_fingerprints.append(turn_fp)
+                if len(recent_turn_fingerprints) > self.config.control_flow_repeat_limit:
+                    recent_turn_fingerprints.pop(0)
+
+                if (
+                    len(recent_turn_fingerprints) == self.config.control_flow_repeat_limit
+                    and len(set(recent_turn_fingerprints)) == 1
+                ):
+                    await self.bus.emit(ControlFlowAborted(
+                        turn=turn,
+                        repeated_count=self.config.control_flow_repeat_limit,
+                        fingerprint=turn_fp,
+                    ))
+                    stop_reason = "control_flow"
                     break
 
                 # Dispatch all tool calls, collect results
@@ -187,6 +219,60 @@ class AgentLoop:
             total_input_tokens=total_input,
             total_output_tokens=total_output,
         )
+
+    async def _complete_with_recovery(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        turn: int,
+    ) -> tuple[ModelResponse, list[dict[str, Any]]]:
+        """Call adapter.complete() with retry for API errors and inline condensation for context errors.
+
+        Returns (response, messages) — messages may differ from input if context was condensed.
+        """
+        api_attempts = 0
+        context_adjusted = False
+
+        while True:
+            try:
+                response = await self._adapter.complete(messages, tools)
+                return response, messages
+
+            except Exception as exc:
+                layer = classify(exc)
+
+                # Transient API error — retry with exponential backoff
+                if layer == FailureLayer.API and api_attempts < self.config.max_api_retries:
+                    api_attempts += 1
+                    delay = min(
+                        self.config.retry_base_delay * (self.config.retry_backoff ** (api_attempts - 1)),
+                        self.config.retry_max_delay,
+                    )
+                    await self.bus.emit(RetryScheduled(
+                        turn=turn,
+                        attempt=api_attempts,
+                        error=str(exc),
+                        error_type=type(exc).__name__,
+                        delay=delay,
+                        layer=layer.value,
+                    ))
+                    await asyncio.sleep(delay)
+                    continue
+
+                # Context overflow — condense and retry once
+                if layer == FailureLayer.CONTEXT and not context_adjusted:
+                    context_adjusted = True
+                    before = len(messages)
+                    _, messages = await self._condense(messages)
+                    await self.bus.emit(ContextCondensed(
+                        turn=turn,
+                        messages_before=before,
+                        messages_after=len(messages),
+                        input_tokens_before=0,  # unknown — the call failed before returning usage
+                    ))
+                    continue
+
+                raise  # FATAL, or retries/adjustments exhausted
 
     async def _condense(
         self, messages: list[dict[str, Any]]

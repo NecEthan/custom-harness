@@ -95,6 +95,25 @@ class ContextCondensed:
     timestamp: float = field(default_factory=time.time)
 
 
+@dataclass(frozen=True)
+class RetryScheduled:
+    turn: int
+    attempt: int        # 1-indexed retry attempt number
+    error: str
+    error_type: str
+    delay: float        # seconds before retry
+    layer: str          # FailureLayer value
+    timestamp: float = field(default_factory=time.time)
+
+
+@dataclass(frozen=True)
+class ControlFlowAborted:
+    turn: int
+    repeated_count: int  # how many consecutive identical turns triggered the abort
+    fingerprint: str     # what was repeating (tool:input summary)
+    timestamp: float = field(default_factory=time.time)
+
+
 Event = (
     AgentStarted
     | TurnStarted
@@ -106,6 +125,8 @@ Event = (
     | AgentFinished
     | AgentFailed
     | ContextCondensed
+    | RetryScheduled
+    | ControlFlowAborted
 )  # discriminated union — all event types the bus can carry
 
 
