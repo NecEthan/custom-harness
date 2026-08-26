@@ -80,12 +80,13 @@ def test_schemas(registry):
 # ---------------------------------------------------------------------------
 
 async def test_blocked_tool_returns_permission_error():
+    # EXECUTE is the only permission not available in DEFAULT mode
     r = ToolRegistry(mode=PermissionMode.DEFAULT)
-    r.register(make_tool("writer", ToolPermission.EDIT))
-    result = await r.call("writer", "id-p1", {})
+    r.register(make_tool("shell", ToolPermission.EXECUTE))
+    result = await r.call("shell", "id-p1", {})
     assert result.is_error
     assert "PermissionError" in result.output
-    assert "edit" in result.output
+    assert "execute" in result.output
     assert "default" in result.output
 
 
@@ -121,13 +122,16 @@ async def test_accept_edits_allows_edit():
     assert not result.is_error
 
 
-async def test_plan_blocks_edit_and_execute():
+async def test_plan_blocks_execute_only():
     r = ToolRegistry(mode=PermissionMode.PLAN)
     r.register(make_tool("writer", ToolPermission.EDIT))
     r.register(make_tool("shell", ToolPermission.EXECUTE))
-    for name, tid in [("writer", "p8"), ("shell", "p9")]:
-        result = await r.call(name, tid, {})
-        assert result.is_error, f"{name} should be blocked in PLAN"
+    # write_file (EDIT) now allowed in all modes
+    writer_result = await r.call("writer", "p8", {})
+    assert not writer_result.is_error, "EDIT should be allowed in PLAN"
+    # shell (EXECUTE) still blocked
+    shell_result = await r.call("shell", "p9", {})
+    assert shell_result.is_error, "EXECUTE should be blocked in PLAN"
 
 
 def test_schemas_filtered_by_mode():
@@ -138,8 +142,8 @@ def test_schemas_filtered_by_mode():
     schemas = r.schemas()
     names = [s["name"] for s in schemas]
     assert "reader" in names
-    assert "writer" not in names
-    assert "shell" not in names
+    assert "writer" in names   # EDIT allowed in all modes
+    assert "shell" not in names  # EXECUTE still gated to BYPASS only
 
 
 def test_schemas_bypass_shows_all():

@@ -136,6 +136,38 @@ body {
   opacity: 0.5;
 }
 
+.task-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.mode-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mode-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.mode-select:focus { border-color: var(--agent); }
+
+.mode-select:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .task-actions {
   display: flex;
   flex-direction: column;

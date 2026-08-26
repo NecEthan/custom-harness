@@ -22,7 +22,6 @@ class AdapterConfig:
     max_output_tokens: int = 8096
     context_limit: int = 200_000  # tokens — all current Claude models share this limit
     system: str = "You are a helpful AI coding assistant."
-    # api_key read from ANTHROPIC_API_KEY env var by default
 
 
 # ---------------------------------------------------------------------------

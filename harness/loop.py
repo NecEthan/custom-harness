@@ -6,7 +6,10 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from harness.memory import MemoryManager
 
 from harness.adapter import AdapterConfig, AnthropicAdapter, ModelResponse
 from harness.errors import FailureLayer, classify
@@ -63,16 +66,23 @@ class AgentLoop:
         registry: ToolRegistry,
         config: LoopConfig | None = None,
         bus: EventBus | None = None,
+        memory: "MemoryManager | None" = None,
     ) -> None:
         self.registry = registry
         self.config = config or LoopConfig()
         self.bus = bus or EventBus()
         self._adapter = AnthropicAdapter(self.config.adapter)
+        self.memory = memory
 
     async def run(self, task: str) -> AgentResult:
         await self.bus.emit(AgentStarted(task=task))
 
         messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
+
+        # Recall: inject relevant memories before the first turn
+        if self.memory:
+            messages = await self.memory.before_run(task, messages)
+
         tools = self.registry.schemas()
         model = self.config.adapter.model
 
@@ -211,6 +221,13 @@ class AgentLoop:
             total_turns=turn,
             final_text=final_text,
         ))
+
+        # Extraction: persist new memories from this run (failure must not break the caller)
+        if self.memory:
+            try:
+                await self.memory.after_run(task, messages)
+            except Exception:
+                pass
 
         return AgentResult(
             final_text=final_text,

@@ -6,11 +6,19 @@ import { MetricsPanel } from './components/MetricsPanel';
 import { RunSummary } from './components/RunSummary';
 import { ExecutionTimeline } from './components/ExecutionTimeline';
 
+const PERMISSION_MODES = [
+  { value: 'default',            label: 'Default (read-only)' },
+  { value: 'plan',               label: 'Plan (read-only)' },
+  { value: 'acceptEdits',        label: 'Accept Edits (read + write)' },
+  { value: 'bypassPermissions',  label: 'Bypass (read + write + shell)' },
+] as const;
+
 export default function App() {
   const [task, setTask] = useState('');
   const [runId, setRunId] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [permissionMode, setPermissionMode] = useState<string>('default');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Each run gets a unique URL via ?_run=N — forces the hook to reset + reconnect
@@ -28,7 +36,7 @@ export default function App() {
       const res = await fetch('/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: task.trim() }),
+        body: JSON.stringify({ task: task.trim(), permission_mode: permissionMode }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }));
@@ -74,6 +82,20 @@ export default function App() {
           rows={2}
           disabled={running}
         />
+        <div className="task-controls">
+          <label className="mode-label" htmlFor="permission-mode">Mode</label>
+          <select
+            id="permission-mode"
+            className="mode-select"
+            value={permissionMode}
+            onChange={e => setPermissionMode(e.target.value)}
+            disabled={running}
+          >
+            {PERMISSION_MODES.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+        </div>
         <div className="task-actions">
           {!done && !running && (
             <button
