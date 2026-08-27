@@ -147,7 +147,7 @@ async def test_api_error_retried_then_succeeds(registry):
     side_effects = [make_rate_limit_error(), make_rate_limit_error(), make_text_response("ok")]
     with (
         patch.object(loop._adapter, "complete", new=AsyncMock(side_effect=side_effects)),
-        patch("harness.loop.asyncio.sleep", new=AsyncMock()),
+        patch("harness.recovery.asyncio.sleep", new=AsyncMock()),
     ):
         result = await loop.run("task")
 
@@ -167,7 +167,7 @@ async def test_api_error_exhausts_retries_and_raises(registry):
     side_effects = [make_rate_limit_error()] * 3  # one more than max_api_retries
     with (
         patch.object(loop._adapter, "complete", new=AsyncMock(side_effect=side_effects)),
-        patch("harness.loop.asyncio.sleep", new=AsyncMock()),
+        patch("harness.recovery.asyncio.sleep", new=AsyncMock()),
         pytest.raises(anthropic.RateLimitError),
     ):
         await loop.run("task")
@@ -189,7 +189,7 @@ async def test_retry_delay_is_exponential(registry):
 
     with (
         patch.object(loop._adapter, "complete", new=AsyncMock(side_effect=side_effects)),
-        patch("harness.loop.asyncio.sleep", new=record_sleep),
+        patch("harness.recovery.asyncio.sleep", new=record_sleep),
     ):
         await loop.run("task")
 
@@ -209,7 +209,7 @@ async def test_retry_delay_capped_at_max(registry):
 
     with (
         patch.object(loop._adapter, "complete", new=AsyncMock(side_effect=side_effects)),
-        patch("harness.loop.asyncio.sleep", new=record_sleep),
+        patch("harness.recovery.asyncio.sleep", new=record_sleep),
     ):
         await loop.run("task")
 
@@ -223,7 +223,7 @@ async def test_fatal_error_not_retried(registry):
 
     with (
         patch.object(loop._adapter, "complete", new=AsyncMock(side_effect=make_fatal_error())),
-        patch("harness.loop.asyncio.sleep", new=AsyncMock()),
+        patch("harness.recovery.asyncio.sleep", new=AsyncMock()),
         pytest.raises(anthropic.BadRequestError),
     ):
         await loop.run("task")

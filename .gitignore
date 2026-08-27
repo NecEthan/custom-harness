@@ -10,3 +10,6 @@ build/
 *.egg
 frontend/node_modules/
 frontend/dist/
+frontend/.next/
+ui-test/node_modules/
+ui-test/.next/

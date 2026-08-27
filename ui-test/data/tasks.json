@@ -1,0 +1,136 @@
+{
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "Set up CI/CD pipeline",
+      "description": "Configure GitHub Actions workflows for automated testing, linting, and deployment to staging and production environments.",
+      "status": "done",
+      "priority": "high",
+      "assignee": "Alice Chen",
+      "tags": ["devops", "infrastructure"],
+      "createdAt": "2026-07-15T09:00:00Z",
+      "dueDate": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "task-002",
+      "title": "Design database schema",
+      "description": "Create entity-relationship diagram and finalize PostgreSQL schema for the core product tables.",
+      "status": "done",
+      "priority": "high",
+      "assignee": "Bob Martinez",
+      "tags": ["database", "architecture"],
+      "createdAt": "2026-07-15T09:30:00Z",
+      "dueDate": "2026-07-25T00:00:00Z"
+    },
+    {
+      "id": "task-003",
+      "title": "Implement user authentication",
+      "description": "Build JWT-based auth with refresh tokens. Include login, logout, register, and password reset flows.",
+      "status": "in_progress",
+      "priority": "high",
+      "assignee": "Alice Chen",
+      "tags": ["auth", "security", "backend"],
+      "createdAt": "2026-07-20T10:00:00Z",
+      "dueDate": "2026-08-10T00:00:00Z"
+    },
+    {
+      "id": "task-004",
+      "title": "Build dashboard UI",
+      "description": "Create the main dashboard with metrics cards, charts, and a recent activity feed.",
+      "status": "in_progress",
+      "priority": "medium",
+      "assignee": "Carol Kim",
+      "tags": ["frontend", "ui"],
+      "createdAt": "2026-07-22T11:00:00Z",
+      "dueDate": "2026-08-15T00:00:00Z"
+    },
+    {
+      "id": "task-005",
+      "title": "Write API documentation",
+      "description": "Document all REST endpoints using OpenAPI 3.1 spec. Include request/response examples for each route.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": "Bob Martinez",
+      "tags": ["docs", "api"],
+      "createdAt": "2026-07-25T14:00:00Z",
+      "dueDate": "2026-08-20T00:00:00Z"
+    },
+    {
+      "id": "task-006",
+      "title": "Add pagination to list endpoints",
+      "description": "Implement cursor-based pagination for /users, /projects, and /tasks endpoints. Default page size 25.",
+      "status": "todo",
+      "priority": "low",
+      "assignee": "Alice Chen",
+      "tags": ["backend", "api"],
+      "createdAt": "2026-07-28T09:00:00Z",
+      "dueDate": "2026-08-25T00:00:00Z"
+    },
+    {
+      "id": "task-007",
+      "title": "Performance audit",
+      "description": "Run Lighthouse and Web Vitals audit on main pages. Target LCP < 2.5s, FID < 100ms, CLS < 0.1.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": "Carol Kim",
+      "tags": ["performance", "frontend"],
+      "createdAt": "2026-07-28T10:00:00Z",
+      "dueDate": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": "task-008",
+      "title": "Set up error monitoring",
+      "description": "Integrate Sentry for both frontend and backend. Configure alerts for p99 error rates above 1%.",
+      "status": "in_progress",
+      "priority": "high",
+      "assignee": "Bob Martinez",
+      "tags": ["observability", "devops"],
+      "createdAt": "2026-08-01T08:00:00Z",
+      "dueDate": "2026-08-12T00:00:00Z"
+    },
+    {
+      "id": "task-009",
+      "title": "Write unit tests for auth module",
+      "description": "Achieve 90% coverage on the authentication module. Focus on token validation and refresh logic.",
+      "status": "todo",
+      "priority": "high",
+      "assignee": "Alice Chen",
+      "tags": ["testing", "auth"],
+      "createdAt": "2026-08-02T09:00:00Z",
+      "dueDate": "2026-08-15T00:00:00Z"
+    },
+    {
+      "id": "task-010",
+      "title": "Mobile responsive layout",
+      "description": "Ensure all pages are fully responsive for screens 320px and up. Test on iPhone SE, Pixel 5, iPad.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": "Carol Kim",
+      "tags": ["frontend", "mobile", "ui"],
+      "createdAt": "2026-08-03T11:00:00Z",
+      "dueDate": "2026-08-28T00:00:00Z"
+    },
+    {
+      "id": "task-011",
+      "title": "Implement rate limiting",
+      "description": "Add Redis-backed rate limiting to public API endpoints. 100 req/min per IP, 1000 req/min per authenticated user.",
+      "status": "todo",
+      "priority": "high",
+      "assignee": "Bob Martinez",
+      "tags": ["security", "backend", "infrastructure"],
+      "createdAt": "2026-08-05T09:00:00Z",
+      "dueDate": "2026-08-20T00:00:00Z"
+    },
+    {
+      "id": "task-012",
+      "title": "Code review process documentation",
+      "description": "Write team guidelines for PR size, review turnaround time, and merge requirements.",
+      "status": "done",
+      "priority": "low",
+      "assignee": "Carol Kim",
+      "tags": ["docs", "process"],
+      "createdAt": "2026-08-06T14:00:00Z",
+      "dueDate": "2026-08-10T00:00:00Z"
+    }
+  ]
+}
