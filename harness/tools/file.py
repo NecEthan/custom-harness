@@ -10,6 +10,7 @@ from harness.registry import ToolDefinition, ToolRegistry
 
 MAX_LINES = 200
 MAX_DIR_ENTRIES = 200
+MAX_FIND_RESULTS = 500
 
 
 def _safe_path(root: Path, relative: str) -> Path:
@@ -131,12 +132,62 @@ def register_file_tools(registry: ToolRegistry, root: str | Path) -> None:
         permission=ToolPermission.EDIT,
     ))
 
+    async def find_files(pattern: str = "**/*", path: str = ".") -> str:
+        base = _safe_path(root, path)
+        if not base.exists():
+            raise FileNotFoundError(f"No such directory: {path}")
+
+        matches = sorted(base.glob(pattern))
+        # Strip root prefix for readability
+        entries = []
+        for m in matches[:MAX_FIND_RESULTS]:
+            rel = m.relative_to(root)
+            kind = "file" if m.is_file() else "dir "
+            entries.append(f"{kind}  {rel}")
+
+        result: dict = {
+            "pattern": pattern,
+            "base": path,
+            "count": len(entries),
+            "paths": "\n".join(entries) if entries else "(no matches)",
+        }
+        if len(matches) > MAX_FIND_RESULTS:
+            result["truncated"] = True
+            result["message"] = f"Returned first {MAX_FIND_RESULTS} of {len(matches)} matches. Narrow the pattern."
+        return json.dumps(result)
+
+    registry.register(ToolDefinition(
+        name="find_files",
+        description=(
+            "Recursively search for files/directories matching a glob pattern under a base path. "
+            "Returns all matches in one call — use this instead of repeated list_directory calls. "
+            "Examples: pattern='**/*.py' finds all Python files, pattern='**/api*' finds API-related paths. "
+            f"Returns up to {MAX_FIND_RESULTS} results."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern (default: '**/*' for all files). E.g. '**/*.py', 'src/**/*.ts'",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Base directory to search from (default: '.')",
+                },
+            },
+            "required": [],
+        },
+        fn=find_files,
+        permission=ToolPermission.READ,
+    ))
+
     registry.register(ToolDefinition(
         name="list_directory",
         description=(
-            f"List up to {MAX_DIR_ENTRIES} entries in a directory (relative to working root). "
-            "Returns JSON with total_entries, offset, shown, entries, and a message if truncated. "
-            "If truncated, call again with offset set to the next unseen entry index."
+            f"List entries in a single directory (non-recursive). "
+            "For exploring a tree or finding files across subdirectories, prefer find_files instead. "
+            "Returns JSON with total_entries, offset, shown, entries. If truncated, call again with next offset."
         ),
         input_schema={
             "type": "object",
