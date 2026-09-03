@@ -233,6 +233,27 @@ async def test_model_called_emitted_each_turn(registry):
     assert called[1].message_count > called[0].message_count
 
 
+async def test_model_called_carries_full_payload(registry):
+    bus, events = collect_bus()
+    loop = AgentLoop(registry, bus=bus)
+    with patch.object(loop._adapter, "complete", new=AsyncMock(
+        return_value=make_text_response("ok")
+    )):
+        await loop.run("test task")
+
+    called = events_of(events, ModelCalled)[0]
+    # messages tuple contains the actual message dicts
+    assert isinstance(called.messages, tuple)
+    assert len(called.messages) == called.message_count
+    assert called.messages[0]["role"] == "user"
+    assert called.messages[0]["content"] == "test task"
+    # tools tuple contains actual tool schemas
+    assert isinstance(called.tools, tuple)
+    assert len(called.tools) == called.tool_count
+    # system prompt present
+    assert called.system == loop.config.adapter.system
+
+
 # ---------------------------------------------------------------------------
 # ModelResponded
 # ---------------------------------------------------------------------------
@@ -286,6 +307,37 @@ async def test_model_responded_per_turn(registry):
     assert responded[0].output_tokens == 10
     assert responded[1].input_tokens == 30
     assert responded[1].output_tokens == 5
+
+
+async def test_model_responded_carries_full_content(registry):
+    bus, events = collect_bus()
+    loop = AgentLoop(registry, bus=bus)
+    with patch.object(loop._adapter, "complete", new=AsyncMock(
+        return_value=make_text_response("hello world")
+    )):
+        await loop.run("task")
+
+    responded = events_of(events, ModelResponded)[0]
+    assert isinstance(responded.content, tuple)
+    assert len(responded.content) > 0
+    from harness.adapter import TextBlock
+    assert any(isinstance(b, TextBlock) and b.text == "hello world" for b in responded.content)
+
+
+async def test_model_responded_tool_use_content(registry):
+    bus, events = collect_bus()
+    responses = [
+        make_tool_response("greet", "tid-x", {"name": "A"}),
+        make_text_response("done"),
+    ]
+    loop = AgentLoop(registry, bus=bus)
+    with patch.object(loop._adapter, "complete", new=AsyncMock(side_effect=responses)):
+        await loop.run("task")
+
+    from harness.adapter import ToolUseBlock
+    responded = events_of(events, ModelResponded)
+    first = responded[0]
+    assert any(isinstance(b, ToolUseBlock) and b.name == "greet" for b in first.content)
 
 
 # ---------------------------------------------------------------------------

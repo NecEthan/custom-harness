@@ -109,6 +109,9 @@ class AgentLoop:
                 await self.bus.emit(ModelCalled(
                     turn=turn, model=model,
                     message_count=len(messages), tool_count=len(tools),
+                    messages=tuple(messages),
+                    tools=tuple(tools),
+                    system=self.config.adapter.system,
                 ))
 
                 t0 = time.perf_counter()
@@ -127,6 +130,7 @@ class AgentLoop:
                     output_tokens=response.output_tokens,
                     latency=latency,
                     stop_reason=response.stop_reason,
+                    content=tuple(response.content),
                 ))
 
                 messages.append({"role": "assistant", "content": _response_to_content(response)})

@@ -21,6 +21,9 @@ export type ModelCalledEvent = {
   model: string;
   message_count: number;
   tool_count: number;
+  messages: unknown[];       // full message list sent to LLM
+  tools: unknown[];          // full tool schemas sent to LLM
+  system: string;            // system prompt sent to LLM
   timestamp: number;
 };
 
@@ -32,6 +35,7 @@ export type ModelRespondedEvent = {
   output_tokens: number;
   latency: number;
   stop_reason: string;
+  content: unknown[];        // full normalized response content blocks
   timestamp: number;
 };
 

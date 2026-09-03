@@ -29,6 +29,9 @@ class ModelCalled:
     model: str
     message_count: int
     tool_count: int
+    messages: tuple[Any, ...]        # full message list sent to LLM
+    tools: tuple[Any, ...]           # full tool schemas sent to LLM
+    system: str                      # system prompt sent to LLM
     timestamp: float = field(default_factory=time.time)
 
 
@@ -40,6 +43,7 @@ class ModelResponded:
     output_tokens: int
     latency: float  # seconds, measured around adapter.complete()
     stop_reason: str
+    content: tuple[Any, ...]         # full normalized response content blocks
     timestamp: float = field(default_factory=time.time)
 
 
