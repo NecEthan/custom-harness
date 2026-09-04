@@ -250,8 +250,9 @@ async def test_model_called_carries_full_payload(registry):
     # tools tuple contains actual tool schemas
     assert isinstance(called.tools, tuple)
     assert len(called.tools) == called.tool_count
-    # system prompt present
+    # system prompt and max_tokens present
     assert called.system == loop.config.adapter.system
+    assert called.max_tokens == loop.config.adapter.max_output_tokens
 
 
 # ---------------------------------------------------------------------------

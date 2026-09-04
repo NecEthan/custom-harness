@@ -24,6 +24,7 @@ export type ModelCalledEvent = {
   messages: unknown[];       // full message list sent to LLM
   tools: unknown[];          // full tool schemas sent to LLM
   system: string;            // system prompt sent to LLM
+  max_tokens: number;        // max_tokens sent to LLM
   timestamp: number;
 };
 
@@ -36,6 +37,8 @@ export type ModelRespondedEvent = {
   latency: number;
   stop_reason: string;
   content: unknown[];        // full normalized response content blocks
+  response_id: string;       // Anthropic message ID (e.g. msg_01abc...)
+  model_used: string;        // actual model string returned by API
   timestamp: number;
 };
 

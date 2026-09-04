@@ -32,6 +32,7 @@ class ModelCalled:
     messages: tuple[Any, ...]        # full message list sent to LLM
     tools: tuple[Any, ...]           # full tool schemas sent to LLM
     system: str                      # system prompt sent to LLM
+    max_tokens: int                  # max_tokens sent to LLM
     timestamp: float = field(default_factory=time.time)
 
 
@@ -44,6 +45,8 @@ class ModelResponded:
     latency: float  # seconds, measured around adapter.complete()
     stop_reason: str
     content: tuple[Any, ...]         # full normalized response content blocks
+    response_id: str                 # Anthropic message ID (e.g. msg_01abc...)
+    model_used: str                  # actual model string returned by API
     timestamp: float = field(default_factory=time.time)
 
 

@@ -42,10 +42,12 @@ class ToolUseBlock:
 
 @dataclass
 class ModelResponse:
-    stop_reason: str                         
+    stop_reason: str
     content: list[TextBlock | ToolUseBlock]
     input_tokens: int
     output_tokens: int
+    response_id: str = ""  # Anthropic message ID (e.g. msg_01abc...)
+    model_used: str = ""   # actual model string returned by API
 
     def text(self) -> str:
         parts = [b.text for b in self.content if isinstance(b, TextBlock)]
@@ -98,4 +100,6 @@ class AnthropicAdapter:
             content=content,
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
+            response_id=response.id,
+            model_used=response.model,
         )

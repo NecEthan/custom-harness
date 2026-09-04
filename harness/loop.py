@@ -112,6 +112,7 @@ class AgentLoop:
                     messages=tuple(messages),
                     tools=tuple(tools),
                     system=self.config.adapter.system,
+                    max_tokens=self.config.adapter.max_output_tokens,
                 ))
 
                 t0 = time.perf_counter()
@@ -131,6 +132,8 @@ class AgentLoop:
                     latency=latency,
                     stop_reason=response.stop_reason,
                     content=tuple(response.content),
+                    response_id=response.response_id,
+                    model_used=response.model_used,
                 ))
 
                 messages.append({"role": "assistant", "content": _response_to_content(response)})

@@ -26,8 +26,9 @@ def all_events():
         AgentStarted(task="test task"),
         TurnStarted(turn=1),
         ModelCalled(turn=1, model="claude-sonnet-4-6", message_count=1, tool_count=3,
-                    messages=({"role": "user", "content": "test task"},), tools=(), system="You are helpful."),
-        ModelResponded(turn=1, model="claude-sonnet-4-6", input_tokens=100, output_tokens=50, latency=1.23, stop_reason="tool_use", content=()),
+                    messages=({"role": "user", "content": "test task"},), tools=(), system="You are helpful.", max_tokens=8096),
+        ModelResponded(turn=1, model="claude-sonnet-4-6", input_tokens=100, output_tokens=50, latency=1.23,
+                       stop_reason="tool_use", content=(), response_id="msg_01abc", model_used="claude-sonnet-4-6"),
         ToolCalled(turn=1, tool_use_id="tid-1", name="read_file", input={"path": "src/main.py"}),
         ToolResulted(turn=1, tool_use_id="tid-1", name="read_file", output="content here", is_error=False, duration=0.05),
         ToolResulted(turn=1, tool_use_id="tid-2", name="broken_tool", output="RuntimeError: boom", is_error=True, duration=0.01),
@@ -67,7 +68,7 @@ def test_model_called_serialization():
     msgs = ({"role": "user", "content": "hi"},)
     tool_schemas = ({"name": "read_file", "description": "read", "input_schema": {}},)
     event = ModelCalled(turn=2, model="claude-sonnet-4-6", message_count=5, tool_count=4,
-                        messages=msgs, tools=tool_schemas, system="Be helpful.")
+                        messages=msgs, tools=tool_schemas, system="Be helpful.", max_tokens=4096)
     d = event_to_dict(event)
     assert d["type"] == "ModelCalled"
     assert d["turn"] == 2
@@ -77,6 +78,7 @@ def test_model_called_serialization():
     assert d["messages"] == msgs
     assert d["tools"] == tool_schemas
     assert d["system"] == "Be helpful."
+    assert d["max_tokens"] == 4096
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +96,8 @@ def test_model_responded_serialization():
         latency=1.23,
         stop_reason="tool_use",
         content=blocks,
+        response_id="msg_01test",
+        model_used="claude-sonnet-4-6-20251001",
     )
     d = event_to_dict(event)
     assert d["type"] == "ModelResponded"
@@ -102,6 +106,8 @@ def test_model_responded_serialization():
     assert d["latency"] == pytest.approx(1.23)
     assert d["stop_reason"] == "tool_use"
     assert d["content"] == ({"text": "hello"}, {"tool_use_id": "t1", "name": "greet", "input": {"name": "X"}})
+    assert d["response_id"] == "msg_01test"
+    assert d["model_used"] == "claude-sonnet-4-6-20251001"
 
 
 # ---------------------------------------------------------------------------
